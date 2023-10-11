@@ -154,10 +154,109 @@ exports.book_delete_post = asyncHandler(async (req, res, next) => {
 
 // Exibir formulário de atualização do livro em GET
 exports.book_update_get = asyncHandler(async (req, res, next) => {
-    res.send("NOT IMPLEMENTED: Book update GET")
+    // Pegar livro, autores e gêneros do formulario
+    const [book, allAuthors, allGenres] = await Promise.all([
+
+        Book.findById(req.params.id).populate("author").populate("genre").exec(),
+        Author.find().exec(),
+        Genre.find().exec(),
+    ])
+
+    if(book ===null){
+        const err = new Error("Book not Found")
+        err.status = 404
+        return next(err)
+    }
+
+    // Marca nossos gêneros selecionados como marcados.
+    for(const genre of allGenres){
+        for(const book_g of book.genre){
+            if(genre._id.toString() === book_g._id.toString()){
+                genre.checked = "true"
+            }
+        }
+    }
+
+    res.render("book_form", {
+        title: "Update Book",
+        authors: allAuthors,
+        genres: allGenres,
+        book: book,
+    })
+
 })
 
 // Lidar com atualização de livro no POST
-exports.book_update_post = asyncHandler(async (req, res, next) => {
-    res.send("NOT IMPLEMENTED: Book update POST")
-})
+exports.book_update_post = [
+    // Converter gênero em um array
+    (req, res, next) =>{
+        if(!(req.body.genre instanceof Array)){
+            if (typeof req.body.genre === "undefined"){
+                req.body.genre = []
+
+            }else{
+                req.body.genre = new Array(req.body.genre)
+            }
+        }
+        next()
+    },
+
+    // Validar os campos 
+    body("title", "Title must not be empty").trim().isLength({ min: 1 }).escape(),
+    body("author", "Author must not be empty").trim().isLength({ min: 1 }).escape(),
+    body("summary", "Summary must not be empty").trim().isLength({ min: 1 }).escape(),
+    body("isbn", "ISBN must not be empty").trim().isLength({ min: 1 }).escape(),
+    body("genre.*").escape(),
+
+    // Processar solicitação após validação
+    asyncHandler(async (req, res, next) => {
+    
+        // Extraia os erros de validação de uma solicitação.
+        const errors = validationResult(req)
+
+        const book = new Book({
+            title: req.body.title,
+            author: req.body.author,
+            summary: req.body.summary,
+            isbn: req.body.isbn,
+            genre: typeof req.body.genre === "undefined" ? [] : req.body.genre,
+            _id: req.params.id, // / Isso é obrigatório ou um novo ID será atribuído!
+        })
+
+        if(!errors.isEmpty()){
+            // Existem erros. 
+            // Renderize o formulário novamente com valores/erros consertados
+
+            // Pegar livro, autores e gêneros do formulario
+            const [book, allAuthors, allGenres] = await Promise.all([
+
+                Book.findById(req.params.id).populate("author").populate("genre").exec(),
+                Author.find().exec(),
+                Genre.find().exec(),
+            ])
+
+            // Marca nossos gêneros selecionados como marcados.
+            for(const genre of allGenres){
+                if(book.genre.indexOf(genre._id) > -1){
+                    genre.checked = "true"
+                }
+            }
+
+            res.render("book_form", {
+                title: "Update Book",
+                authors: allAuthors,
+                genres: allGenres,
+                book: book,
+                errors: errors.array(),
+            })  
+            return
+        }else{
+            // Os dados do formulário são válidos. 
+            //Atualize o registro.
+            const updatedBook = await Book.findByIdAndUpdate(req.params.id, book, {})
+
+            // redirecionar para a pagina de detalhes
+            res.redirect(updatedBook.url)
+        }
+    }),
+]
