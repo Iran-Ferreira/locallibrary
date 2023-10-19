@@ -28,14 +28,6 @@ AuthorSchema.virtual("lifespan").get(function(){
     const deathDate = DateTime.fromJSDate(this.date_of_death).toLocaleString(DateTime.DATE_MED)
 
     return `${birthDate} - ${deathDate}`
-
-    
-    /* return(
-        DateTime.fromJSDate(this.date_of_birth).toLocaleString(DateTime.DATE_MED)     
-        
-        // Colocar datas de morte do autor
-        // Colocar mensagens de erros quando o autor não tiver data
-    ); */
 })
 
 // Virtual for author URL
